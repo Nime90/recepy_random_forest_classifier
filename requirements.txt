@@ -1,0 +1,12 @@
+google-cloud-bigquery==3.38.0
+google-cloud-bigquery-storage==2.28.0
+google-genai==1.51.0
+pandas==2.3.3
+umap-learn==0.5.9.post2
+matplotlib==3.10.7
+scikit-learn==1.7.2
+numpy==2.3.5
+tqdm==4.67.1
+db-dtypes==1.4.4
+python-dotenv==1.2.1
+pyarrow==22.0.0

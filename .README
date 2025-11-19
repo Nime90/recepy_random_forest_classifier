@@ -3,3 +3,7 @@ this is a random forest classifier to group recepies into
 2. shake
 3. smoothie
 based on their recipeId, recipeName, recipeTags, recipeIngredients, procedure, protein, carbohydrate, fat, minimumCalories, maximumCalories, prepareTimeInMinutes & cookingTimeInMinutes.
+
+Step1. Prepare the data to be trained (embedding exercise)
+Setp2. Create a model using the embedded data and the additional numerical data
+Step3. use the model to predict recipes
