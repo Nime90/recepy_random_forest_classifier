@@ -20,13 +20,27 @@ client_gemini = genai.Client(api_key = os.getenv("GEMINI_API_KEY"))
 
 def import_new_data(limit = 1000):
   query = f"""
-  SELECT
-    recipeId,recipeName,recipeTags,recipeIngredients,procedure,protein, carbohydrate, fat, minimumCalories, maximumCalories, prepareTimeInMinutes,
-    case when cookingTimeInMinutes is NULL then 0 else cookingTimeInMinutes end as cookingTimeInMinutes,
-    FROM `bi-lenus-staging.dbt_nime.sot_meal_recipes` r
-    where r.language = 'en-US' and r.owner is NULL and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_us_v2`)
-    LIMIT {limit}
-    """
+    with new_data as (
+    SELECT
+        recipeId,recipeName,recipeTags,recipeIngredients,procedure,protein, carbohydrate, fat, minimumCalories, maximumCalories, prepareTimeInMinutes,
+        case when cookingTimeInMinutes is NULL then 0 else cookingTimeInMinutes end as cookingTimeInMinutes,
+        FROM `bi-lenus-staging.dbt_nime.sot_meal_recipes` r
+        where r.language = 'en-US' and r.owner is NULL and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_us_v2`)
+        LIMIT {limit}
+        )
+        ,img as (
+        select
+            meal_id as recipeId,
+            concat('https://eu.lenus.io/admin/meals/meals-live/bulk-edit/', meal_variation_group_id, '#', meal_id) as adminLink
+            from bi-lenus-prod.dbt_staging.stg_appdb_snapshot__meal
+            )
+        select 
+            new_data.*,
+            img.adminLink
+            from new_data
+            left join img
+            on new_data.recipeId = img.recipeId
+        """
   df = client_bq.query(query).to_dataframe()
   print('data imported correctly')
   return df
@@ -198,7 +212,7 @@ def write_data(df, table_id, if_exists='replace'):
 
 
 
-new_data = import_new_data(500)
+new_data = import_new_data(10)
 recipe_name_emb = txt_embender_nd(col = 'recipeName', training_data = new_data, save_emb = False)
 recipe_tags_emb = txt_embender_nd(col = 'recipeTags', training_data = new_data, save_emb = False)
 recipe_ingredients_emb = txt_embender_nd(col = 'recipeIngredients', training_data = new_data, save_emb = False)
@@ -250,8 +264,7 @@ df_nd = new_data[[
   'procedure_UMAP_col1','procedure_UMAP_col2', 'procedure_pca_col1', 'procedure_pca_col2',
   ]]
 
-with open('models/random_forest_recipes_model_us_v2_2k_obs.pkl', 'rb') as f:
-    model = pickle.load(f)
+with open('models/random_forest_recipes_model_us_v2_2k_obs.pkl', 'rb') as f: model = pickle.load(f)
 print('model loaded')
 
 flag_pred = model.predict(df_nd)
@@ -264,7 +277,6 @@ new_data_flagged['language'] = 'en-US'
 new_data_flagged['comment'] = None
 new_data_flagged['owner'] = None
 new_data_flagged['reason'] = None
-new_data_flagged['adminLink'] = None
 
 
 porridge = []
@@ -296,6 +308,6 @@ new_data_flagged['smoothie'] = smoothie
 
 cols_order = ['recipeId','recipeName','language','recipeTags','recipeIngredients','protein','carbohydrate','fat','minimumCalories','maximumCalories','prepareTimeInMinutes','cookingTimeInMinutes','comment','procedure','owner','porridge','shake','smoothie','reason','adminLink']
 df_for_bq = new_data_flagged[cols_order]
+new_data_flagged.flag.value_counts()
 
 write_data(df = df_for_bq , table_id = 'bi-lenus-staging.dbt_nime.meal_recipes_flag_us_v2', if_exists='append')
-
