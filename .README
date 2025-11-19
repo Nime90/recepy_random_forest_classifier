@@ -1,0 +1,5 @@
+this is a random forest classifier to group recepies into 
+1. porridge
+2. shake
+3. smoothie
+based on their recipeId, recipeName, recipeTags, recipeIngredients, procedure, protein, carbohydrate, fat, minimumCalories, maximumCalories, prepareTimeInMinutes & cookingTimeInMinutes.
