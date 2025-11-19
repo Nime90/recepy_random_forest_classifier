@@ -117,11 +117,11 @@ def txt_embender(training_data, col = 'recipeName'):
         recipe_ids.append(recipe_id)
     
     df_emb = pd.DataFrame({'recipeId': recipe_ids, 'embedding': texts_emb})
-    df_emb.to_parquet(f'{col}_emb.parquet')
+    df_emb.to_parquet(f'emb_data/{col}_emb.parquet')
     return df_emb
 
 training_data = import_training_data()
-#recipe_name_emb = txt_embender(training_data, col = 'recipeName')
+recipe_name_emb = txt_embender(training_data, col = 'recipeName')
 recipe_tags_emb = txt_embender(training_data, col = 'recipeTags')
 recipe_ingredients_emb = txt_embender(training_data, col = 'recipeIngredients')
 recipe_procedure_emb = txt_embender(training_data, col = 'procedure')

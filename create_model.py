@@ -143,10 +143,10 @@ def import_training_data():
 credentials, project_id = default()
 client_bq = bigquery.Client(credentials=credentials,project=project_id )
 
-recipeIngredients_emb = pd.read_parquet('recipeIngredients_emb.parquet')
-recipeName_emb = pd.read_parquet('recipeName_emb.parquet')
-recipeProcedure_emb = pd.read_parquet('procedure_emb.parquet')
-recipeTags_emb = pd.read_parquet('recipeTags_emb.parquet')
+recipeIngredients_emb = pd.read_parquet('emb_data/recipeIngredients_emb.parquet')
+recipeName_emb = pd.read_parquet('emb_data/recipeName_emb.parquet')
+recipeProcedure_emb = pd.read_parquet('emb_data/procedure_emb.parquet')
+recipeTags_emb = pd.read_parquet('emb_data/recipeTags_emb.parquet')
 
 recipeIngredients_UMAP = reduce_embendings(recipeIngredients_emb,'ingredients')
 recipeName_UMAP = reduce_embendings(recipeName_emb,'rec_name')
@@ -219,4 +219,4 @@ unique, counts = np.unique(y_test, return_counts=True)
 print(dict(zip(unique, counts)))
 
 
-with open('random_forest_recipes_model_us_v2_2k_obs.pkl', 'wb') as f: pickle.dump(model, f)
+with open('models/random_forest_recipes_model_us_v2_2k_obs.pkl', 'wb') as f: pickle.dump(model, f)
