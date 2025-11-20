@@ -266,7 +266,8 @@ for i in tqdm(range(10), desc="Processing main batches"):
         start_index = end_index
         end_index = start_index + batch_size
 
-
+    data_redu.drop_duplicates(subset = 'recipeId',inplace = True)
+    data_redu.reset_index(drop = True,inplace = True)
     df_nd = data_redu[[
     'protein', 'carbohydrate', 'fat', 'minimumCalories', 'maximumCalories', 'prepareTimeInMinutes', 'cookingTimeInMinutes',
     'recipe_UMAP_col1', 'recipe_UMAP_col2', 'recipe_pca_col1', 'recipe_pca_col2',
@@ -274,7 +275,7 @@ for i in tqdm(range(10), desc="Processing main batches"):
 
     flag_pred = model.predict(df_nd)
     flag_pred_proba = model.predict_proba(df_nd)
-
+    
     new_data['flag'] = flag_pred
     new_data['flag_proba'] = flag_pred_proba.tolist()
     print('flag predicted')
