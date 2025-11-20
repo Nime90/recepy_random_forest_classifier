@@ -1,4 +1,4 @@
-###-------------------------------------LABEL NEW DATA-------------------------------------
+###-------------------------------------LABEL ONE DATA-------------------------------------
 from google.cloud import bigquery
 from dotenv import load_dotenv
 from google.auth import default
@@ -31,15 +31,14 @@ project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
 client_bq = bigquery.Client(credentials=credentials,project=project_id )
 client_gemini = genai.Client(api_key = os.getenv("GEMINI_API_KEY"))
 
-def import_new_data(limit = 1000):
+def import_new_data(recipeId = 'ec9198e2-ef79-47a0-adf6-d0caf7c15fd2'):
   query = f"""
-    with new_data as (
+       with new_data as (
     SELECT
         recipeId,recipeName,recipeTags,recipeIngredients,procedure,protein, carbohydrate, fat, minimumCalories, maximumCalories, prepareTimeInMinutes,
         case when cookingTimeInMinutes is NULL then 0 else cookingTimeInMinutes end as cookingTimeInMinutes,
         FROM `bi-lenus-staging.dbt_nime.sot_meal_recipes` r
-        where r.language = 'en-US' and r.owner is NULL and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_us_v2`)
-        LIMIT {limit}
+        where r.recipeId = '{recipeId}' and r.language = 'en-US'   
         )
         ,img as (
         select
@@ -263,7 +262,7 @@ recipeTags_emb = pd.read_parquet('emb_data/recipeTags_emb.parquet')
 print('training embeddings imported')
 
 #import new data
-new_data = import_new_data(limit = 1)
+new_data = import_new_data(recipeId = 'e35449af-1555-4aeb-b1b4-fe5faa73e38f')
 data_redu = pd.DataFrame()
 start_index = 0
 batch_size = 10
@@ -325,7 +324,8 @@ with open('models/random_forest_recipes_model_us_v2_2k_obs.pkl', 'rb') as f: mod
 print('model loaded')
 
 flag_pred = model.predict(df_nd)
-
+flag_pred_label = ['Porridge', 'Shake', 'Smoothie', 'Other'][int(flag_pred)]
+flag_proba = model.predict_proba(df_nd)
 print('recipeId: ', new_data.iloc[0]['recipeId'])
 print('recipeName: ', new_data.iloc[0]['recipeName'])
 print('recipeTags: ', new_data.iloc[0]['recipeTags'])
@@ -337,5 +337,9 @@ print('minimumCalories: ', new_data.iloc[0]['minimumCalories'])
 print('maximumCalories: ', new_data.iloc[0]['maximumCalories'])
 print('prepareTimeInMinutes: ', new_data.iloc[0]['prepareTimeInMinutes'])
 print('cookingTimeInMinutes: ', new_data.iloc[0]['cookingTimeInMinutes'])
-print('flag predicted: ', flag_pred)
+print('flag predicted: ', flag_pred_label)
+print('flag probability porridge: ', flag_proba[0][0])
+print('flag probability shake: ', flag_proba[0][1])
+print('flag probability smoothie: ', flag_proba[0][2])
+print('flag probability other: ', flag_proba[0][3])
 
