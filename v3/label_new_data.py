@@ -233,7 +233,7 @@ recipe_full_text_emb = pd.read_parquet('/Users/nicola.menale/Desktop/recepy_rand
 
 print('training embeddings imported')
 
-for i in tqdm(range(10), desc="Processing main batches"):
+for i in tqdm(range(25), desc="Processing main batches"):
     #import new data
     new_data = import_new_data(limit = 500)
     data_redu = pd.DataFrame()
@@ -245,23 +245,27 @@ for i in tqdm(range(10), desc="Processing main batches"):
     for i in range(0, len(new_data), batch_size): 
         print(f'Processing batch {i} to {i + batch_size}')
         new_data_t = new_data[start_index:end_index]
+        new_data_t.reset_index(drop = True,inplace = True)
 
         recipe_emb = txt_embender_nd(col = 'recipe_full_text', training_data = new_data_t, save_emb = False)
         #print(f'Embeddings generated for batch {start_index} to {end_index}')
 
-
         #stuck new data on top of training embeddings
         recipe_emb_full = pd.concat([recipe_full_text_emb, recipe_emb])
 
+        #reduce embeddings with UMAP and PCA
         recipe_UMAP = reduce_embeddings(recipe_emb_full,'recipe')
         recipe_PCA = reduce_embeddings_pca(recipe_emb_full,'recipe')
 
         #print(f'Embeddings reduced for batch {start_index} to {end_index}')
-
         new_data_t = pd.merge(new_data_t, recipe_UMAP, on='recipeId', how='left')
         new_data_t = pd.merge(new_data_t, recipe_PCA, on='recipeId', how='left')  
-
+        
+        #drop duplicates
+        new_data_t.drop_duplicates(subset = 'recipeId',inplace = True)
+        new_data_t.reset_index(drop = True,inplace = True)
         data_redu = pd.concat([data_redu, new_data_t])
+        
         #print(f'Data reduced for batch {start_index} to {end_index}')
         start_index = end_index
         end_index = start_index + batch_size
