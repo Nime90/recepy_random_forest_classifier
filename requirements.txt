@@ -10,3 +10,13 @@ tqdm==4.67.1
 db-dtypes==1.4.4
 python-dotenv==1.2.1
 pyarrow==22.0.0
+
+# GPU acceleration libraries (optional - for GPU-accelerated UMAP and PCA)
+# Note: cuML and cuPy require CUDA and are platform-specific
+# Installation options:
+# 1. Using conda (recommended):
+#    conda install -c rapidsai -c conda-forge -c nvidia cuml cudatoolkit=11.8
+# 2. Using pip (Linux/Windows with CUDA):
+#    pip install cuml-cu11 cupy-cuda11x
+#    (Adjust CUDA version suffix as needed: cu11, cu12, etc.)
+# If GPU libraries are not available, the code will automatically fall back to CPU
