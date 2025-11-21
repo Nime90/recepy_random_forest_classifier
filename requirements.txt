@@ -10,6 +10,8 @@ tqdm==4.67.1
 db-dtypes==1.4.4
 python-dotenv==1.2.1
 pyarrow==22.0.0
+seaborn==0.13.2
+streamlit==1.51.0
 
 # GPU acceleration libraries (optional - for GPU-accelerated UMAP and PCA)
 # Note: cuML and cuPy require CUDA and are platform-specific
