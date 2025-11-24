@@ -60,6 +60,7 @@ def import_recipe_examples(limit=20):
 def generate_recipe(new_recipe_idea, recipe_examples):
     prompt = f'''Given this recipe idea: {new_recipe_idea}, please suggest a 
         1.recipeName 2.recipeTags 3.recipeIngredients 4.procedure 
+        **important: include the quantity of the ingredients in grams or ml in the procedure**
         After that, please compute the following nutritional information per portion: 
         5.protein, 6.carbohydrate, 7.fat, 8.minimumCalories, 9.maximumCalories, 10.prepareTimeInMinutes, 11.cookingTimeInMinutes.
         Finally suggest the 12.flag of this recipe, choosing from the following options: porridge, shake, smoothie, other.
@@ -75,8 +76,21 @@ def generate_recipe(new_recipe_idea, recipe_examples):
         contents=prompt,
         config=types.GenerateContentConfig(temperature=0)
     )
-
+    #st.write(response.text)
+    #response_nutritional_info = client_gemini.models.generate_content(
+    #    model="gemini-2.5-flash",
+    #    contents=f'''Given this recipe: {response.text}, evaluate the nutritional information per portion : protein, carbohydrate, fat, minimumCalories, maximumCalories, prepareTimeInMinutes, cookingTimeInMinutes. 
+    #    for each nutritional information evaluation, please return the computation steps and the final value.
+    #    Finally return the same table with the correct values for the nutritional information.
+    #    ###OUTPUT - structure###
+    #    please only return the table in json format with one row and the following columns: recipeName, recipeTags, recipeIngredients, procedure, protein, carbohydrate, fat, minimumCalories, maximumCalories, prepareTimeInMinutes, cookingTimeInMinutes, flag, reason, nutritional_info_evaluation.
+    #    NOT INTRO NOT COMMENTS are needed.
+    #    ''',
+    #    config=types.GenerateContentConfig(temperature=0)
+    #)
+    #st.write(response_nutritional_info.text)
     # Clean and parse JSON response
+    #response_text = response_nutritional_info.text.replace("```json", "").replace("```", "").strip()
     response_text = response.text.replace("```json", "").replace("```", "").strip()
     try:
         response_json = json.loads(response_text)
