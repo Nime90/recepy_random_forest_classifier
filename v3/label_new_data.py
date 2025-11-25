@@ -18,7 +18,17 @@ credentials, project_id = default()
 client_bq = bigquery.Client(credentials=credentials,project=project_id )
 client_gemini = genai.Client(api_key = os.getenv("GEMINI_API_KEY"))
 
-def import_new_data(limit = 1000):
+reducer = umap.UMAP(
+    n_components=2,
+    random_state=42, # for reproducible results
+    n_neighbors=5,   # Focus on tighter, local clusters
+    min_dist=0.3     # Slightly spread points for visual clarity
+    )
+
+LANGUAGE = 'da-DK'
+TABLE_LANGUAGE = 'dk'
+
+def import_new_data(limit = 1000, language = LANGUAGE, table_language = TABLE_LANGUAGE):
   query = f"""
     with new_data as (
       SELECT
@@ -41,7 +51,8 @@ def import_new_data(limit = 1000):
         CASE WHEN prepareTimeInMinutes is NULL THEN 0 ELSE prepareTimeInMinutes END as prepareTimeInMinutes,
         CASE WHEN cookingTimeInMinutes is NULL THEN 0 ELSE cookingTimeInMinutes END as cookingTimeInMinutes,
         FROM `bi-lenus-staging.dbt_nime.sot_meal_recipes` r
-        where r.language = 'en-US' and r.owner is NULL and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_us_v3`)
+        where r.language = '{language}' and r.owner is NULL and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_{table_language}_v3`)
+        and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_us_v3`)
         LIMIT {limit}
         )
         ,img as (
@@ -144,12 +155,6 @@ def reduce_embeddings(embeddings_matrix,name_col):
     # Reorder columns to have recipeId first
     emb_table = emb_table[['recipeId'] + [col for col in emb_table.columns if col != 'recipeId']]
         # Step 3.2: UMAP Dimensionality Reduction
-    reducer = umap.UMAP(
-        n_components=2,
-        random_state=42, # for reproducible results
-        n_neighbors=5,   # Focus on tighter, local clusters
-        min_dist=0.3     # Slightly spread points for visual clarity
-        )
 
     projected_embeddings = reducer.fit_transform(emb_table_to_reduce)
     
@@ -235,7 +240,7 @@ print('training embeddings imported')
 
 for i in tqdm(range(25), desc="Processing main batches"):
     #import new data
-    new_data = import_new_data(limit = 500)
+    new_data = import_new_data(limit = 500, language = LANGUAGE, table_language = TABLE_LANGUAGE)
     data_redu = pd.DataFrame()
     start_index = 0
     batch_size = 10
@@ -319,7 +324,7 @@ for i in tqdm(range(25), desc="Processing main batches"):
 
     cols_order = ['recipeId','recipeName','language','recipeTags','recipeIngredients','protein','carbohydrate','fat','minimumCalories','maximumCalories','prepareTimeInMinutes','cookingTimeInMinutes','comment','procedure','owner','porridge','shake','smoothie','reason','adminLink','flag_proba']
     df_for_bq = new_data_flagged[cols_order]
-    write_data(df = df_for_bq , table_id = 'bi-lenus-staging.dbt_nime.meal_recipes_flag_us_v3', if_exists='append')
+    write_data(df = df_for_bq , table_id = f'bi-lenus-staging.dbt_nime.meal_recipes_flag_{TABLE_LANGUAGE}_v3', if_exists='append')
 
     print('Values flagged:')
     print(new_data_flagged.flag.value_counts())
