@@ -25,8 +25,8 @@ reducer = umap.UMAP(
     min_dist=0.3     # Slightly spread points for visual clarity
     )
 
-LANGUAGE = 'da-DK'
-TABLE_LANGUAGE = 'dk'
+LANGUAGE = 'en-US'
+TABLE_LANGUAGE = 'us'
 
 def import_new_data(limit = 1000, language = LANGUAGE, table_language = TABLE_LANGUAGE):
   query = f"""
@@ -51,7 +51,7 @@ def import_new_data(limit = 1000, language = LANGUAGE, table_language = TABLE_LA
         CASE WHEN prepareTimeInMinutes is NULL THEN 0 ELSE prepareTimeInMinutes END as prepareTimeInMinutes,
         CASE WHEN cookingTimeInMinutes is NULL THEN 0 ELSE cookingTimeInMinutes END as cookingTimeInMinutes,
         FROM `bi-lenus-staging.dbt_nime.sot_meal_recipes` r
-        where r.language = '{language}' and r.owner is NULL and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_{table_language}_v3`)
+        where r.language = '{language}' and r.owner IS NOT NULL and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_{table_language}_v3`)
         and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_us_v3`)
         LIMIT {limit}
         )
