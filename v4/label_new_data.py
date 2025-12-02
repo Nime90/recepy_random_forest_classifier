@@ -26,9 +26,9 @@ reducer = umap.UMAP(
     )
 
 LANGUAGE = 'en-US'
-TABLE_LANGUAGE = 'us'
+FLAGGED_TABLE = 'meal_recipes_flag_us_v4'
 
-def import_new_data(limit = 1000, language = LANGUAGE, table_language = TABLE_LANGUAGE):
+def import_new_data(limit = 1000, language = LANGUAGE, flagged_table = FLAGGED_TABLE):
   query = f"""
     with new_data as (
       SELECT
@@ -50,9 +50,10 @@ def import_new_data(limit = 1000, language = LANGUAGE, table_language = TABLE_LA
         maximumCalories, 
         CASE WHEN prepareTimeInMinutes is NULL THEN 0 ELSE prepareTimeInMinutes END as prepareTimeInMinutes,
         CASE WHEN cookingTimeInMinutes is NULL THEN 0 ELSE cookingTimeInMinutes END as cookingTimeInMinutes,
-        FROM `bi-lenus-staging.dbt_nime.sot_meal_recipes` r
-        where r.language = '{language}' and r.owner IS NOT NULL and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_{table_language}_v3`)
-        and r.recipeId not in (select distinct recipeId from `bi-lenus-staging.dbt_nime.meal_recipes_flag_us_v3`)
+        owner,
+        comment
+        FROM `{project_id}.dbt_nime.sot_meal_recipes` r
+        where r.language = '{language}' and r.recipeId not in (select distinct recipeId from `{project_id}.dbt_nime.{flagged_table}`)
         LIMIT {limit}
         )
         ,img as (
@@ -230,7 +231,24 @@ def write_data(df, table_id, if_exists='replace'):
 
     print(f"Data successfully written to {table_id}")
 
+def cleaner(recipeId,recipe_description,flag):
+    response = client_gemini.models.generate_content(
+        model="gemini-2.5-flash-lite",
+        contents= f'''The provided recipe have been flagged as {flag}. Please carefully read the provided recipe and flag the recipe as porridge, smoothie, shake or other. 
+        Only return the correct flag for the recipe. No intro nor explanation is needed. 
+        ###Output###
+        return a single word between porridge, smoothie, shake or other.
+        ###Recipe###
+        Recipe: {recipe_description}'''
+        )
+        
+    df = pd.DataFrame()
+    df['recipeId'] = [recipeId]
+    df['new_flag'] = str(response.text).replace('```json','').replace('```','')
+    
+    return df
 
+#importing model
 with open('/Users/nicola.menale/Desktop/recepy_random_forest_classifier/models/random_forest_recipes_model_us_v3_2k_obs.pkl', 'rb') as f: model = pickle.load(f)
 
 #import training embeddings
@@ -238,10 +256,10 @@ recipe_full_text_emb = pd.read_parquet('/Users/nicola.menale/Desktop/recepy_rand
 
 print('training embeddings imported')
 
-for i in tqdm(range(100), desc="Processing main batches"):
+for proc_r in tqdm(range(5), desc="Processing main batches"):
     try:
         #import new data
-        new_data = import_new_data(limit = 500, language = LANGUAGE, table_language = TABLE_LANGUAGE)
+        new_data = import_new_data(limit = 500)
         data_redu = pd.DataFrame()
         start_index = 0
         batch_size = 10
@@ -292,10 +310,37 @@ for i in tqdm(range(100), desc="Processing main batches"):
         new_data['flag_proba'] = flag_pred_proba.tolist()
         print('flag predicted')
 
-        new_data_flagged = new_data.copy()
-        new_data_flagged['language'] = 'en-US'
-        new_data_flagged['comment'] = None
-        new_data_flagged['owner'] = None
+        ##### --------------------------INSERTING THE CLEANER HERE -------------------------- #####
+        new_data_cleaned = pd.DataFrame()
+
+        for row in new_data[new_data.flag != 3].reset_index(drop=True).iterrows():
+            new_data_cleaned_t = cleaner(recipeId=row[1].recipeId,recipe_description=row[1].recipe_full_text,flag=row[1].flag)
+            new_data_cleaned = pd.concat([new_data_cleaned, new_data_cleaned_t])
+
+        new_data_cleaned.reset_index(drop=True,inplace=True)
+        new_data_cleaned['new_flag'] = new_data_cleaned['new_flag'].str.lower()
+
+        new_data_cleaned = pd.merge(new_data, new_data_cleaned[['recipeId','new_flag']], on='recipeId', how='left')
+
+        new_flag_num = []
+        for f in new_data_cleaned['new_flag']:
+            if f == 'porridge':
+                new_flag_num.append(0)
+            elif f == 'shake':
+                new_flag_num.append(1)
+            elif f == 'smoothie':
+                new_flag_num.append(2)
+            else:
+                new_flag_num.append(3)
+
+        new_data_cleaned['new_flag_num'] = new_flag_num
+        new_data_cleaned.drop(columns=['new_flag','flag'],inplace=True)
+        new_data_cleaned.rename(columns={'new_flag_num':'flag'},inplace=True)
+
+        ##### --------------------------END OF INSERTING THE CLEANER HERE -------------------------- #####
+
+        new_data_flagged = new_data_cleaned.copy()
+        new_data_flagged['language'] = LANGUAGE
         new_data_flagged['reason'] = None
 
 
@@ -324,10 +369,9 @@ for i in tqdm(range(100), desc="Processing main batches"):
         new_data_flagged['porridge'] = porridge
         new_data_flagged['shake'] = shake
         new_data_flagged['smoothie'] = smoothie
-
         cols_order = ['recipeId','recipeName','language','recipeTags','recipeIngredients','protein','carbohydrate','fat','minimumCalories','maximumCalories','prepareTimeInMinutes','cookingTimeInMinutes','comment','procedure','owner','porridge','shake','smoothie','reason','adminLink','flag_proba']
         df_for_bq = new_data_flagged[cols_order]
-        write_data(df = df_for_bq , table_id = f'bi-lenus-staging.dbt_nime.meal_recipes_flag_{TABLE_LANGUAGE}_v3', if_exists='append')
+        write_data(df = df_for_bq , table_id = f'{project_id}.dbt_nime.{FLAGGED_TABLE}', if_exists='append')
 
         print('Values flagged:')
         print(new_data_flagged.flag.value_counts())
